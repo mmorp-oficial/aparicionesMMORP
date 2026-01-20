@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MMORP Apariciones - Mapa del Patrimonio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;600&family=Poppins:wght@600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <style>
+    :root {
+      --bg: #FFFFFF;
+      --surface: rgba(31, 37, 43, 0.05);
+      --surface-2: rgba(31, 37, 43, 0.08);
+      --text: #1F252B;
+      --muted: #246B73;
+      --border: rgba(175, 176, 175, 0.3);
+      --accent: #06A4B2;
+      --accent-2: #246B73;
+      --highlight: #FFE601;
+      --shadow: rgba(31, 37, 43, 0.1);
+      --danger: #dc2626;
+    }
+    [data-theme="dark"] {
+      --bg: #1F252B;
+      --surface: rgba(255, 255, 255, 0.05);
+      --surface-2: rgba(255, 255, 255, 0.08);
+      --text: #FFFFFF;
+      --muted: #AFB0AF;
+      --border: rgba(175, 176, 175, 0.2);
+      --accent: #06A4B2;
+      --accent-2: #246B73;
+      --highlight: #FFE601;
+      --shadow: rgba(0, 0, 0, 0.3);
+      --danger: #ef4444;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; font-weight: 300; background: var(--bg); color: var(--text); }
+    h1, h2, h3, .modal-header h2, .popup-title, .about-hero h1, .about-section h2 { font-family: 'Poppins', sans-serif; font-weight: 600; }
+    .btn, .form-label, .filter-label, .site-badge, .popup-badge, .filters-title, .sites-title, .legend-title { font-family: 'Inter', sans-serif; font-weight: 600; }
+    
+    .app { display: flex; height: 100vh; overflow: hidden; }
+    
+    .sidebar { width: 320px; background: var(--bg); display: flex; flex-direction: column; border-right: 1px solid var(--border); z-index: 1000; transition: margin-left 0.3s; }
+    .sidebar.closed { margin-left: -320px; }
+    
+    .sidebar-header { padding: 16px; border-bottom: 1px solid var(--border); }
+    .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .logo { display: flex; align-items: center; gap: 12px; }
+    .logo-svg { height: 28px; width: auto; color: var(--text); }
+    
+    .theme-toggle { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; cursor: pointer; color: var(--text); font-size: 16px; transition: all 0.2s; }
+    .theme-toggle:hover { background: var(--surface); border-color: var(--accent); }
+    
+    .btn { padding: 10px 16px; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px; justify-content: center; text-decoration: none; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-2); }
+    .btn-secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--surface); border-color: var(--accent); }
+    
+    .action-buttons { display: flex; gap: 8px; margin-bottom: 12px; }
+    .action-buttons .btn { flex: 1; }
+    
+    .filters { display: flex; flex-direction: column; gap: 8px; }
+    .filters-title { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+    .filter-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
+    .filter-item:hover { background: var(--surface); }
+    .filter-item input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent); }
+    .filter-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .filter-label { font-size: 14px; flex: 1; color: var(--text); }
+    .filter-count { font-size: 12px; color: var(--muted); }
+    
+    .sites-list { flex: 1; overflow-y: auto; padding: 12px; }
+    .sites-title { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; padding: 0 4px 8px; }
+    
+    .site-card { padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s; }
+    .site-card:hover, .site-card.active { background: var(--surface-2); border-color: var(--accent); }
+    .site-card-inner { display: flex; gap: 12px; }
+    .site-icon { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+    .site-info { flex: 1; min-width: 0; }
+    .site-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+    .site-location { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .site-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 12px; margin-top: 6px; }
+    
+    .sidebar-toggle { position: fixed; left: 320px; top: 50%; transform: translateY(-50%); z-index: 1001; background: var(--bg); border: 1px solid var(--border); border-left: none; padding: 12px 8px; border-radius: 0 8px 8px 0; cursor: pointer; color: var(--text); transition: all 0.3s; }
+    .sidebar.closed ~ .sidebar-toggle { left: 0; }
+    
+    .map-container { flex: 1; position: relative; }
+    #map { position: absolute; inset: 0; background: var(--bg); z-index: 1; }
+    
+    .leaflet-popup-content-wrapper { background: var(--bg); color: var(--text); border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 4px 20px var(--shadow); }
+    .leaflet-popup-tip { background: var(--bg); }
+    .leaflet-popup-content { margin: 0; min-width: 250px; }
+    .leaflet-popup-close-button { color: var(--muted) !important; font-size: 20px !important; }
+    .leaflet-popup-close-button:hover { color: var(--text) !important; }
+    
+    .popup-content { padding: 0; }
+    .popup-header { height: 4px; border-radius: 16px 16px 0 0; }
+    .popup-body { padding: 16px; }
+    .popup-title-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+    .popup-icon { font-size: 24px; }
+    .popup-title { font-size: 16px; line-height: 1.3; color: var(--text); }
+    .popup-location { font-size: 13px; color: var(--muted); }
+    .popup-badges { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .popup-badge { font-size: 11px; padding: 4px 10px; border-radius: 12px; }
+    .popup-coords { font-size: 11px; color: var(--muted); margin-bottom: 12px; }
+    .popup-btn { display: block; width: 100%; padding: 10px 16px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-size: 13px; font-family: 'Inter', sans-serif; font-weight: 600; cursor: pointer; text-decoration: none; text-align: center; }
+    .popup-btn:hover { background: var(--accent-2); }
+    
+    .legend { position: absolute; bottom: 20px; left: 20px; z-index: 1000; background: var(--bg); padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 20px var(--shadow); }
+    .legend-title { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text); margin-bottom: 4px; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+    
+    .loading { position: absolute; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 2000; }
+    .loading-content { text-align: center; }
+    .loading-spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
+    .empty-state-icon { font-size: 48px; margin-bottom: 12px; }
+
+    @media (max-width: 768px) {
+      .sidebar { position: fixed; left: 0; top: 0; height: 100%; z-index: 1001; }
+      .sidebar.closed { margin-left: -320px; }
+      .sidebar-toggle { position: fixed; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="header-top">
+          <div class="logo">
+            <svg class="logo-svg" viewBox="0 0 1369.53 576" xmlns="http://www.w3.org/2000/svg">
+              <polygon fill="currentColor" points="226.22 265.66 226.22 315.26 275.87 367.26 371.14 272.6 371.14 431.18 411.13 431.18 411.13 228.98 368.47 228.98 275.77 318.27 226.22 265.66"/>
+              <polygon fill="currentColor" points="406.61 153.51 353.55 153.51 275.87 231.9 186.38 142.56 143.82 142.56 143.82 431.18 184.02 431.18 184.02 186.67 275.87 281.64 406.61 153.51"/>
+              <path fill="currentColor" d="M1008.24,431.17l72.14.3v-120.47h80.76s55.07,0,55.07-86.65c0-81.92-55.07-81.48-55.07-81.48l-194.01-.32v34.47l194.01.32s22.09,4.68,22.09,48.55-22.09,50.16-22.09,50.16h-121.16v120.62l-31.74-1.08h0v-145.72h142.4s10.57-3.82,10.57-23.08c0-14.43-11.17-19.52-11.17-19.52h-182.9v223.88"/>
+              <path fill="currentColor" d="M632.03,286.36c0,42.63-32.98,75.11-74.34,75.11-36.36,0-71.45-32.7-71.45-72.67,0-49.41,37.86-76.73,74.06-76.73,39.57,0,71.74,34.86,71.74,74.29ZM528.1,288.27c0,14.99,12.77,31.37,31.03,31.37,19.27,0,30.95-17.94,30.95-31.57,0-20.53-14.16-34.1-30.26-34.1-19.1,0-31.71,15.3-31.71,34.3Z"/>
+              <path fill="currentColor" d="M698.05,283.27c0,97.84-75.61,147.92-141.55,147.69-60.25-.21-136.27-55.17-136.27-143.09,0-93.1,75.18-145.31,140.96-145.31s136.85,61.16,136.85,140.71ZM462.21,286.86c0,60.91,46.39,101.88,96.9,101.88s96.93-39.28,96.93-101.92c0-47.12-33.98-101.91-95.06-101.91s-98.77,49.08-98.77,101.95Z"/>
+              <path fill="currentColor" d="M901.1,275.74s22.09-6.29,22.09-50.16-22.09-48.55-22.09-48.55l-152.9-.02v219.35h32.06s0-189.09,0-189.09l40,.02h72.96c10.32,6.07,10.31,36.5,0,42.6h-72.96v181.25h-113.16V142.54l194.01.02s55.07-.44,55.07,81.47c0,86.64-55.07,86.64-55.07,86.64l39.86,120.48h-43.23l-47.73-120.48v-34.94"/>
+            </svg>
+          </div>
+          <button class="theme-toggle" id="themeToggle" title="Cambiar tema">🌙</button>
+        </div>
+        
+        <div class="action-buttons">
+          <button class="btn btn-primary" onclick="loadData()" id="reloadBtn">🔄 Actualizar</button>
+        </div>
+        <button class="btn btn-secondary" style="width:100%; margin-bottom:8px;" onclick="openModal('about')">ℹ️ Acerca de</button>
+        <a href="https://mmorp.mx/" target="_blank" class="btn btn-secondary" style="width:100%; margin-bottom:16px;">🏛️ Conoce más de MMORP</a>
+        
+        <div class="filters">
+          <div class="filters-title">Filtrar por estado</div>
+          <label class="filter-item">
+            <input type="checkbox" id="filter-disponible" checked>
+            <span class="filter-dot" style="background:#06A4B2"></span>
+            <span class="filter-label">Disponible</span>
+            <span class="filter-count" id="count-disponible">0</span>
+          </label>
+          <label class="filter-item">
+            <input type="checkbox" id="filter-reconocida" checked>
+            <span class="filter-dot" style="background:#FFE601"></span>
+            <span class="filter-label">Reconocida</span>
+            <span class="filter-count" id="count-reconocida">0</span>
+          </label>
+          <label class="filter-item">
+            <input type="checkbox" id="filter-perdida" checked>
+            <span class="filter-dot" style="background:#AFB0AF"></span>
+            <span class="filter-label">Perdida</span>
+            <span class="filter-count" id="count-perdida">0</span>
+          </label>
+          <label class="filter-item">
+            <input type="checkbox" id="filter-proximamente" checked>
+            <span class="filter-dot" style="background:#246B73"></span>
+            <span class="filter-label">Próximamente</span>
+            <span class="filter-count" id="count-proximamente">0</span>
+          </label>
+        </div>
+      </div>
+      <div class="sites-list" id="sitesList"></div>
+    </aside>
+    
+    <button class="sidebar-toggle" id="sidebarToggle">◀</button>
+    
+    <main class="map-container">
+      <div id="map"></div>
+      <div class="legend">
+        <div class="legend-title">Leyenda</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#06A4B2"></span> Disponible</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#FFE601"></span> Reconocida</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#AFB0AF"></span> Perdida</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#246B73"></span> Próximamente</div>
+      </div>
+      <div class="loading" id="loading">
+        <div class="loading-content">
+          <div class="loading-spinner"></div>
+          <p>Cargando apariciones...</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal Acerca de -->
+  <div class="modal-overlay" id="modalAbout" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:2000;display:none;align-items:center;justify-content:center;padding:20px;">
+    <div class="modal" style="background:var(--bg);border-radius:16px;border:1px solid var(--border);width:100%;max-width:500px;max-height:90vh;overflow:hidden;">
+      <div class="modal-header" style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+        <h2 style="font-size:18px;">ℹ️ MMORP Apariciones</h2>
+        <button onclick="closeModal('about')" style="background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer;">×</button>
+      </div>
+      <div class="modal-body" style="padding:20px;overflow-y:auto;max-height:calc(90vh - 120px);">
+        <p style="margin-bottom:16px;color:var(--muted);">Piezas impresas en 3D inspiradas en el patrimonio urbano-arquitectónico de México. Encuéntralas, escanea el QR y reconoce un fragmento de memoria.</p>
+        <p style="margin-bottom:8px;"><strong>✓ Reconoce primero:</strong> la primera persona que escanea el QR se la lleva.</p>
+        <p style="margin-bottom:8px;"><strong>✓ Desbloquea lo virtual:</strong> historia, ficha, modelo 3D y experiencias AR.</p>
+        <p><strong>✓ Cero daño:</strong> colocación temporal, sin pegamento ni tornillos.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ========== CONFIGURACIÓN ==========
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzzF36xXwzNYWMnBcxl-OZtFloixVCyNbHDc8s8Ei6vJbRsqB3rJpCzrXoDt52rSzZPqQ/exec';
+    
+    const estadoConfig = {
+      disponible: { color: '#06A4B2', label: 'Disponible', textColor: '#FFFFFF' },
+      reconocida: { color: '#FFE601', label: 'Reconocida', textColor: '#1F252B' },
+      perdida: { color: '#AFB0AF', label: 'Perdida', textColor: '#1F252B' },
+      proximamente: { color: '#246B73', label: 'Próximamente', textColor: '#FFFFFF' }
+    };
+    
+    const tipoElementoConfig = {
+      arquitectonico: { label: 'Arquitectónico', icon: '🏛️' },
+      urbano: { label: 'Urbano', icon: '🏙️' },
+      grafico: { label: 'Gráfico', icon: '🎨' },
+      ritual: { label: 'Ritual', icon: '🎭' }
+    };
+
+    let map, markers = [], allSites = [];
+    let filters = { disponible: true, reconocida: true, perdida: true, proximamente: true };
+
+    // ========== TEMA ==========
+    function initTheme() {
+      const theme = localStorage.getItem('mmorp-theme') || 'dark';
+      document.documentElement.dataset.theme = theme;
+      document.getElementById('themeToggle').textContent = theme === 'dark' ? '☀️' : '🌙';
+    }
+
+    function toggleTheme() {
+      const current = document.documentElement.dataset.theme;
+      const newTheme = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.dataset.theme = newTheme;
+      document.getElementById('themeToggle').textContent = newTheme === 'dark' ? '☀️' : '🌙';
+      localStorage.setItem('mmorp-theme', newTheme);
+    }
+
+    // ========== MAPA ==========
+    function initMap() {
+      map = L.map('map', { center: [23.6345, -102.5528], zoom: 5 });
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© OpenStreetMap © CARTO',
+        maxZoom: 19
+      }).addTo(map);
+    }
+
+    function createMarkerIcon(estado) {
+      const color = estadoConfig[estado]?.color || '#AFB0AF';
+      const svg = `<svg width="30" height="40" viewBox="0 0 30 40" xmlns="http://www.w3.org/2000/svg">
+        <path d="M15 0C6.716 0 0 6.716 0 15c0 11.25 15 25 15 25s15-13.75 15-25C30 6.716 23.284 0 15 0z" fill="${color}"/>
+        <circle cx="15" cy="13" r="6" fill="white" opacity="0.9"/>
+      </svg>`;
+      return L.divIcon({
+        html: svg,
+        className: 'custom-marker',
+        iconSize: [30, 40],
+        iconAnchor: [15, 40],
+        popupAnchor: [0, -40]
+      });
+    }
+
+    function createPopupContent(site) {
+      const estado = estadoConfig[site.estado] || estadoConfig.disponible;
+      const tipo = tipoElementoConfig[site.tipo_elemento] || { icon: '📍', label: 'General' };
+      const enlaceBtn = site.enlace_mmorp ? `<a href="${site.enlace_mmorp}" target="_blank" class="popup-btn">🏛️ Conócelo en MMORP</a>` : '';
+      return `
+        <div class="popup-content">
+          <div class="popup-header" style="background:${estado.color}"></div>
+          <div class="popup-body">
+            <div class="popup-title-row">
+              <span class="popup-icon">${tipo.icon}</span>
+              <div>
+                <div class="popup-title">${site.nombre}</div>
+                <div class="popup-location">${site.ubicacion || ''}</div>
+              </div>
+            </div>
+            <div class="popup-badges">
+              <span class="popup-badge" style="background:${estado.color};color:${estado.textColor}">${estado.label}</span>
+              <span class="popup-badge" style="background:var(--surface-2);color:var(--text)">${tipo.label}</span>
+              ${site.elemento ? `<span class="popup-badge" style="background:var(--surface);color:var(--muted)">${site.elemento}</span>` : ''}
+            </div>
+            <div class="popup-coords">📍 ${parseFloat(site.lat).toFixed(4)}, ${parseFloat(site.lng).toFixed(4)}</div>
+            ${enlaceBtn}
+          </div>
+        </div>
+      `;
+    }
+
+    // ========== DATOS ==========
+    async function loadData() {
+      const btn = document.getElementById('reloadBtn');
+      const loading = document.getElementById('loading');
+      
+      btn.textContent = '⏳ Cargando...';
+      btn.disabled = true;
+      loading.style.display = 'flex';
+      
+      try {
+        const response = await fetch(APPS_SCRIPT_URL + '?action=data');
+        const data = await response.json();
+        
+        allSites = data.map((row, i) => ({
+          id: i,
+          nombre: row.nombre || 'Sin nombre',
+          lat: parseFloat(row.lat),
+          lng: parseFloat(row.lng),
+          estado: row.estado || 'disponible',
+          tipo_elemento: row.tipo_elemento || 'arquitectonico',
+          elemento: row.elemento || '',
+          ubicacion: row.ubicacion || '',
+          enlace_mmorp: row.enlace_mmorp || ''
+        })).filter(s => !isNaN(s.lat) && !isNaN(s.lng));
+        
+        updateCounts();
+        updateMarkers();
+        
+        if (allSites.length > 0) {
+          const bounds = L.latLngBounds(allSites.map(s => [s.lat, s.lng]));
+          map.fitBounds(bounds, { padding: [50, 50] });
+        }
+      } catch (e) {
+        console.error('Error cargando datos:', e);
+        alert('Error al cargar datos. Intenta de nuevo.');
+      }
+      
+      btn.textContent = '🔄 Actualizar';
+      btn.disabled = false;
+      loading.style.display = 'none';
+    }
+
+    function updateMarkers() {
+      markers.forEach(m => map.removeLayer(m));
+      markers = [];
+      
+      const filtered = allSites.filter(s => filters[s.estado]);
+      filtered.forEach(site => {
+        const marker = L.marker([site.lat, site.lng], { icon: createMarkerIcon(site.estado) }).addTo(map);
+        marker.bindPopup(createPopupContent(site), { maxWidth: 300 });
+        marker.siteId = site.id;
+        markers.push(marker);
+      });
+      
+      updateSitesList(filtered);
+    }
+
+    function updateSitesList(sites) {
+      const container = document.getElementById('sitesList');
+      if (sites.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🗺️</div><p>No hay apariciones</p></div>';
+        return;
+      }
+      
+      container.innerHTML = `<div class="sites-title">${sites.length} apariciones</div>`;
+      sites.forEach(site => {
+        const estado = estadoConfig[site.estado] || estadoConfig.disponible;
+        const tipo = tipoElementoConfig[site.tipo_elemento] || { icon: '📍' };
+        const card = document.createElement('div');
+        card.className = 'site-card';
+        card.innerHTML = `
+          <div class="site-card-inner">
+            <div class="site-icon" style="background:${estado.color}20">${tipo.icon}</div>
+            <div class="site-info">
+              <div class="site-name">${site.nombre}</div>
+              <div class="site-location">${site.ubicacion || ''}${site.elemento ? ' · ' + site.elemento : ''}</div>
+              <span class="site-badge" style="background:${estado.color};color:${estado.textColor}">${estado.label}</span>
+            </div>
+          </div>
+        `;
+        card.onclick = () => {
+          map.setView([site.lat, site.lng], 15);
+          const marker = markers.find(m => m.siteId === site.id);
+          if (marker) marker.openPopup();
+        };
+        container.appendChild(card);
+      });
+    }
+
+    function updateCounts() {
+      Object.keys(estadoConfig).forEach(estado => {
+        document.getElementById(`count-${estado}`).textContent = allSites.filter(s => s.estado === estado).length;
+      });
+    }
+
+    // ========== MODAL ==========
+    function openModal(type) {
+      document.getElementById('modalAbout').style.display = 'flex';
+    }
+    
+    function closeModal(type) {
+      document.getElementById('modalAbout').style.display = 'none';
+    }
+
+    // ========== EVENTOS ==========
+    document.getElementById('sidebarToggle').addEventListener('click', function() {
+      const sidebar = document.getElementById('sidebar');
+      sidebar.classList.toggle('closed');
+      this.textContent = sidebar.classList.contains('closed') ? '▶' : '◀';
+    });
+
+    document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
+    ['disponible', 'reconocida', 'perdida', 'proximamente'].forEach(estado => {
+      document.getElementById(`filter-${estado}`).addEventListener('change', function() {
+        filters[estado] = this.checked;
+        updateMarkers();
+      });
+    });
+
+    document.getElementById('modalAbout').addEventListener('click', function(e) {
+      if (e.target === this) closeModal('about');
+    });
+
+    // ========== INICIAR ==========
+    initTheme();
+    initMap();
+    loadData();
+  </script>
+</body>
+</html>
