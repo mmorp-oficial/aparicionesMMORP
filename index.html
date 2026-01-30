@@ -561,7 +561,6 @@
           <input type="text" id="nombreUsuario" class="rec-input" placeholder="¿Cómo te llamas?" required>
           <div class="rec-aviso">⚠️ Una vez que confirmes, el patrimonio será tuyo y no podrá ser reconocido por nadie más.</div>
           <button class="rec-btn" onclick="confirmarReconocimiento('${data.id_pieza}')">🎉 ¡Reconocer patrimonio!</button>
-          <button class="rec-btn rec-btn-secondary" onclick="closeReconocerModal()">Cancelar</button>
         `;
       } else if (tipo === 'exito') {
         html += `
