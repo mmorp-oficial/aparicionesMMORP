@@ -224,6 +224,13 @@
     </div>
   </div>
 
+  <!-- Modal Reconocer Patrimonio -->
+  <div class="modal-overlay" id="modalReconocer" style="position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:3000;display:none;align-items:center;justify-content:center;padding:20px;">
+    <div class="modal" style="background:var(--bg);border-radius:24px;border:1px solid var(--border);width:100%;max-width:400px;overflow:hidden;text-align:center;">
+      <div id="reconocerContent"></div>
+    </div>
+  </div>
+
   <script>
     // ========== CONFIGURACIÓN ==========
     const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzzF36xXwzNYWMnBcxl-OZtFloixVCyNbHDc8s8Ei6vJbRsqB3rJpCzrXoDt52rSzZPqQ/exec';
@@ -406,7 +413,7 @@
       });
     }
 
-    // ========== MODAL ==========
+    // ========== MODALES ==========
     function openModal(type) {
       document.getElementById('modalAbout').style.display = 'flex';
     }
@@ -439,6 +446,180 @@
     initTheme();
     initMap();
     loadData();
+    
+    // Verificar si viene de un QR
+    checkUrlParams();
+    
+    // ========== RECONOCIMIENTO POR QR ==========
+    function checkUrlParams() {
+      const params = new URLSearchParams(window.location.search);
+      const action = params.get('action');
+      const id = params.get('id');
+      
+      if (action === 'reconocer' && id) {
+        verificarPieza(id);
+      }
+    }
+    
+    async function verificarPieza(idPieza) {
+      showReconocerModal('loading');
+      
+      try {
+        const response = await fetch(`${APPS_SCRIPT_URL}?action=verificar&id=${encodeURIComponent(idPieza)}`);
+        const data = await response.json();
+        
+        if (!data.success) {
+          showReconocerModal('error', { mensaje: data.error });
+          return;
+        }
+        
+        const pieza = data.pieza;
+        const estado = pieza.estado.toLowerCase().trim();
+        
+        if (estado === 'reconocida') {
+          showReconocerModal('ya_reconocida', pieza);
+        } else if (estado === 'perdida') {
+          showReconocerModal('perdida', pieza);
+        } else if (estado === 'proximamente') {
+          showReconocerModal('proximamente', pieza);
+        } else {
+          showReconocerModal('formulario', { ...pieza, id_pieza: idPieza });
+          
+          if (pieza.lat && pieza.lng) {
+            map.setView([parseFloat(pieza.lat), parseFloat(pieza.lng)], 15);
+          }
+        }
+      } catch (e) {
+        console.error('Error verificando pieza:', e);
+        showReconocerModal('error', { mensaje: 'Error de conexión. Intenta de nuevo.' });
+      }
+    }
+    
+    async function confirmarReconocimiento(idPieza) {
+      const nombreInput = document.getElementById('nombreUsuario');
+      const nombre = nombreInput ? nombreInput.value.trim() : 'Anónimo';
+      
+      if (!nombre) {
+        alert('Por favor ingresa tu nombre');
+        return;
+      }
+      
+      showReconocerModal('loading');
+      
+      try {
+        const response = await fetch(`${APPS_SCRIPT_URL}?action=confirmar&id=${encodeURIComponent(idPieza)}&nombre=${encodeURIComponent(nombre)}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          showReconocerModal('exito', { ...data.pieza, mensaje: data.mensaje });
+          loadData();
+        } else {
+          showReconocerModal(data.error || 'error', { mensaje: data.mensaje });
+        }
+      } catch (e) {
+        console.error('Error confirmando:', e);
+        showReconocerModal('error', { mensaje: 'Error de conexión. Intenta de nuevo.' });
+      }
+    }
+    
+    function showReconocerModal(tipo, data = {}) {
+      const modal = document.getElementById('modalReconocer');
+      const content = document.getElementById('reconocerContent');
+      
+      const estilos = `
+        .rec-icon { font-size: 64px; margin-bottom: 16px; }
+        .rec-titulo { font-family: Poppins, sans-serif; font-size: 24px; margin-bottom: 8px; }
+        .rec-mensaje { color: var(--muted); margin-bottom: 24px; font-size: 14px; }
+        .rec-pieza { font-family: Poppins, sans-serif; font-size: 20px; margin-bottom: 8px; }
+        .rec-info { color: var(--muted); font-size: 14px; margin-bottom: 16px; }
+        .rec-input { width: 100%; padding: 14px 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; color: #fff; font-size: 16px; font-family: Inter, sans-serif; margin-bottom: 16px; }
+        .rec-input:focus { outline: none; border-color: var(--accent); }
+        .rec-btn { display: block; width: 100%; background: var(--accent); color: #fff; padding: 14px 24px; border: none; border-radius: 12px; font-weight: 600; font-size: 16px; cursor: pointer; font-family: Inter, sans-serif; margin-bottom: 12px; text-decoration: none; text-align: center; }
+        .rec-btn:hover { background: var(--accent-2); }
+        .rec-btn-secondary { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); }
+        .rec-btn-secondary:hover { background: rgba(255,255,255,0.15); }
+        .rec-aviso { background: rgba(255,230,1,0.1); border: 1px solid rgba(255,230,1,0.3); border-radius: 10px; padding: 12px; font-size: 12px; color: var(--highlight); margin-bottom: 20px; }
+        .rec-logo { margin-top: 24px; opacity: 0.5; font-size: 12px; }
+        .rec-spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px; }
+      `;
+      
+      let html = `<style>${estilos}</style><div style="padding:40px;">`;
+      
+      if (tipo === 'loading') {
+        html += `
+          <div class="rec-spinner"></div>
+          <p class="rec-mensaje">Verificando patrimonio...</p>
+        `;
+      } else if (tipo === 'formulario') {
+        html += `
+          <div class="rec-icon">🎯</div>
+          <div class="rec-titulo" style="color:var(--accent);">¡ENCONTRASTE UN PATRIMONIO!</div>
+          <p class="rec-mensaje">Ingresa tu nombre para reconocerlo</p>
+          <div class="rec-pieza">${data.nombre || ''}</div>
+          <div class="rec-info">${data.elemento || ''} · ${data.ubicacion || ''}</div>
+          ${data.enlace_mmorp ? `<a href="${data.enlace_mmorp}" target="_blank" class="rec-btn rec-btn-secondary" style="margin-bottom:16px;">🏛️ Conócelo en MMORP</a>` : ''}
+          <input type="text" id="nombreUsuario" class="rec-input" placeholder="¿Cómo te llamas?" required>
+          <div class="rec-aviso">⚠️ Una vez que confirmes, el patrimonio será tuyo y no podrá ser reconocido por nadie más.</div>
+          <button class="rec-btn" onclick="confirmarReconocimiento('${data.id_pieza}')">🎉 ¡Reconocer patrimonio!</button>
+          <button class="rec-btn rec-btn-secondary" onclick="closeReconocerModal()">Cancelar</button>
+        `;
+      } else if (tipo === 'exito') {
+        html += `
+          <div class="rec-icon">🎉</div>
+          <div class="rec-titulo" style="color:var(--accent);">¡RECONOCIDO!</div>
+          <p class="rec-mensaje">${data.mensaje || '¡Felicidades! Has reconocido este patrimonio'}</p>
+          <div class="rec-pieza">${data.nombre || ''}</div>
+          <div class="rec-info">${data.elemento || ''} · ${data.ubicacion || ''}</div>
+          ${data.enlace_mmorp ? `<a href="${data.enlace_mmorp}" target="_blank" class="rec-btn">🏛️ Conócelo en MMORP</a>` : ''}
+          <button class="rec-btn rec-btn-secondary" onclick="closeReconocerModal()">Cerrar</button>
+        `;
+      } else if (tipo === 'ya_reconocida') {
+        html += `
+          <div class="rec-icon">😅</div>
+          <div class="rec-titulo" style="color:var(--highlight);">YA FUE RECONOCIDO</div>
+          <p class="rec-mensaje">¡Este patrimonio ya fue reconocido por alguien más!</p>
+          <div class="rec-pieza">${data.nombre || ''}</div>
+          <div class="rec-info">${data.elemento || ''} · ${data.ubicacion || ''}</div>
+          ${data.enlace_mmorp ? `<a href="${data.enlace_mmorp}" target="_blank" class="rec-btn">🏛️ Conócelo en MMORP</a>` : ''}
+          <button class="rec-btn rec-btn-secondary" onclick="closeReconocerModal()">Cerrar</button>
+        `;
+      } else if (tipo === 'perdida') {
+        html += `
+          <div class="rec-icon">😢</div>
+          <div class="rec-titulo" style="color:var(--muted);">PATRIMONIO PERDIDO</div>
+          <p class="rec-mensaje">Este patrimonio está marcado como perdido</p>
+          <div class="rec-pieza">${data.nombre || ''}</div>
+          ${data.enlace_mmorp ? `<a href="${data.enlace_mmorp}" target="_blank" class="rec-btn">🏛️ Conócelo en MMORP</a>` : ''}
+          <button class="rec-btn rec-btn-secondary" onclick="closeReconocerModal()">Cerrar</button>
+        `;
+      } else if (tipo === 'proximamente') {
+        html += `
+          <div class="rec-icon">⏳</div>
+          <div class="rec-titulo" style="color:var(--accent-2);">PRÓXIMAMENTE</div>
+          <p class="rec-mensaje">Este patrimonio aún no está disponible para reconocer</p>
+          <div class="rec-pieza">${data.nombre || ''}</div>
+          ${data.enlace_mmorp ? `<a href="${data.enlace_mmorp}" target="_blank" class="rec-btn">🏛️ Conócelo en MMORP</a>` : ''}
+          <button class="rec-btn rec-btn-secondary" onclick="closeReconocerModal()">Cerrar</button>
+        `;
+      } else {
+        html += `
+          <div class="rec-icon">❌</div>
+          <div class="rec-titulo" style="color:#dc2626;">ERROR</div>
+          <p class="rec-mensaje">${data.mensaje || 'Ocurrió un error'}</p>
+          <button class="rec-btn rec-btn-secondary" onclick="closeReconocerModal()">Cerrar</button>
+        `;
+      }
+      
+      html += `<div class="rec-logo">🏛️ MMORP Apariciones</div></div>`;
+      
+      content.innerHTML = html;
+      modal.style.display = 'flex';
+    }
+    
+    function closeReconocerModal() {
+      document.getElementById('modalReconocer').style.display = 'none';
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
   </script>
 </body>
 </html>
