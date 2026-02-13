@@ -54,6 +54,22 @@
     .theme-toggle { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; cursor: pointer; color: var(--text); font-size: 16px; transition: all 0.2s; }
     .theme-toggle:hover { background: var(--surface); border-color: var(--accent); }
     
+    .marker-thumb { width: 44px; height: 44px; min-width: 44px; min-height: 44px; aspect-ratio: 1; border-radius: 50%; object-fit: cover; border: 3px solid #06A4B2; box-shadow: 0 2px 8px rgba(0,0,0,0.5); cursor: pointer; transition: transform 0.2s; background: var(--surface); display: block; }
+    .marker-thumb:hover { transform: scale(1.15); }
+    .marker-thumb-wrapper { position: relative; width: 44px; height: 44px; }
+    .marker-fallback { display: none; width: 44px; height: 44px; border-radius: 50%; align-items: center; justify-content: center; font-size: 18px; }
+    .custom-marker { background: none !important; border: none !important; }
+    .custom-marker-thumb { background: none !important; border: none !important; overflow: visible !important; width: 44px !important; height: 44px !important; }
+    
+    .site-thumb { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: var(--surface); }
+    
+    .rec-list-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .rec-list-item:last-child { border-bottom: none; }
+    .rec-list-thumb { width: 48px; height: 48px; border-radius: 10px; object-fit: cover; flex-shrink: 0; background: var(--surface); }
+    .rec-list-info { flex: 1; min-width: 0; }
+    .rec-list-alias { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rec-list-fecha { font-size: 12px; color: var(--muted); }
+    
     .btn { padding: 10px 16px; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px; justify-content: center; text-decoration: none; }
     .btn-primary { background: var(--accent); color: #fff; }
     .btn-primary:hover { background: var(--accent-2); }
@@ -104,6 +120,7 @@
     .leaflet-popup-close-button:hover { color: var(--text) !important; }
     
     .popup-content { padding: 0; }
+    .popup-img { width: 100%; height: 140px; object-fit: cover; display: block; border-radius: 16px 16px 0 0; }
     .popup-header { height: 4px; border-radius: 16px 16px 0 0; }
     .popup-body { padding: 16px; }
     .popup-title-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
@@ -140,10 +157,6 @@
   <div class="app">
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
-        <div class="header-top">
-          <div></div>
-          <button class="theme-toggle" id="themeToggle" title="Cambiar tema">🌙</button>
-        </div>
         <div class="logo">
           <svg class="logo-svg" viewBox="0 0 1369.53 576" xmlns="http://www.w3.org/2000/svg">
             <polygon fill="currentColor" points="226.22 265.66 226.22 315.26 275.87 367.26 371.14 272.6 371.14 431.18 411.13 431.18 411.13 228.98 368.47 228.98 275.77 318.27 226.22 265.66"/>
@@ -156,7 +169,7 @@
         </div>
         
         <div class="action-buttons">
-          <button class="btn btn-primary" onclick="loadData()" id="reloadBtn">🔄 Actualizar</button>
+          <button class="btn btn-primary" onclick="openReconocimientoModal()">🏅 Reconocimiento</button>
         </div>
         <button class="btn btn-secondary" style="width:100%; margin-bottom:8px;" onclick="openModal('about')">ℹ️ Acerca de</button>
         <a href="https://mmorp.mx/" target="_blank" class="btn btn-secondary" style="width:100%; margin-bottom:16px;">🏛️ Conoce más de MMORP</a>
@@ -253,9 +266,22 @@
     </div>
   </div>
 
+  <!-- Modal Reconocimiento (listado) -->
+  <div class="modal-overlay" id="modalReconocimiento" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:2000;display:none;align-items:center;justify-content:center;padding:20px;">
+    <div class="modal" style="background:var(--bg);border-radius:16px;border:1px solid var(--border);width:100%;max-width:500px;max-height:90vh;overflow:hidden;">
+      <div class="modal-header" style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+        <h2 style="font-size:18px;">🏅 Reconocimiento</h2>
+        <button onclick="closeReconocimientoModal()" style="background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer;">×</button>
+      </div>
+      <div class="modal-body" id="reconocimientoBody" style="padding:20px;overflow-y:auto;max-height:calc(90vh - 120px);">
+        <div style="text-align:center;padding:20px;"><div class="loading-spinner"></div><p style="color:var(--muted);">Cargando...</p></div>
+      </div>
+    </div>
+  </div>
+
   <script>
     // ========== CONFIGURACIÓN ==========
-    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwlSkPgEltrwPp2O-s7WlZ6v-dJr96Ytd1uTPaVgU7r7rcFxVMlblpDWJ5xQ52gYYJONQ/exec'; 
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyZyVLd0uVZL079EjWABLQX3g0Wct4TRYPvIZ_WC0xEQs3izoCgAUVsghLSlEY499XR-w/exec'; 
     
     const estadoConfig = {
       disponible: { color: '#06A4B2', label: 'Disponible', textColor: '#FFFFFF' },
@@ -276,17 +302,7 @@
 
     // ========== TEMA ==========
     function initTheme() {
-      const theme = localStorage.getItem('mmorp-theme') || 'dark';
-      document.documentElement.dataset.theme = theme;
-      document.getElementById('themeToggle').textContent = theme === 'dark' ? '☀️' : '🌙';
-    }
-
-    function toggleTheme() {
-      const current = document.documentElement.dataset.theme;
-      const newTheme = current === 'dark' ? 'light' : 'dark';
-      document.documentElement.dataset.theme = newTheme;
-      document.getElementById('themeToggle').textContent = newTheme === 'dark' ? '☀️' : '🌙';
-      localStorage.setItem('mmorp-theme', newTheme);
+      document.documentElement.dataset.theme = 'dark';
     }
 
     // ========== MAPA ==========
@@ -298,8 +314,21 @@
       }).addTo(map);
     }
 
-    function createMarkerIcon(estado) {
+    function createMarkerIcon(estado, imagenUrl) {
       const color = estadoConfig[estado]?.color || '#AFB0AF';
+      if (imagenUrl) {
+        const html = `<div class="marker-thumb-wrapper">
+          <img class="marker-thumb" style="border-color:${color};" src="${imagenUrl}" referrerpolicy="no-referrer" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
+          <div class="marker-fallback" style="background:${color}20;border:3px solid ${color};">📍</div>
+        </div>`;
+        return L.divIcon({
+          html: html,
+          className: 'custom-marker-thumb',
+          iconSize: [44, 44],
+          iconAnchor: [22, 44],
+          popupAnchor: [0, -44]
+        });
+      }
       const svg = `<svg width="30" height="40" viewBox="0 0 30 40" xmlns="http://www.w3.org/2000/svg">
         <path d="M15 0C6.716 0 0 6.716 0 15c0 11.25 15 25 15 25s15-13.75 15-25C30 6.716 23.284 0 15 0z" fill="${color}"/>
         <circle cx="15" cy="13" r="6" fill="white" opacity="0.9"/>
@@ -317,9 +346,15 @@
       const estado = estadoConfig[site.estado] || estadoConfig.disponible;
       const tipo = tipoElementoConfig[site.tipo_elemento] || { icon: '📍', label: 'General' };
       const enlaceBtn = site.enlace_mmorp ? `<a href="${site.enlace_mmorp}" target="_blank" class="popup-btn">🏛️ Conócelo en MMORP</a>` : '';
+      const imgHeader = site.imagen 
+        ? `<img class="popup-img" src="${site.imagen}" referrerpolicy="no-referrer" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" /><div class="popup-header" style="background:${estado.color};display:none;"></div>`
+        : `<div class="popup-header" style="background:${estado.color}"></div>`;
+      const reconocidaPor = (site.estado === 'reconocida' && site.reconocido_por)
+        ? `<div style="font-size:12px;color:var(--highlight);margin-bottom:12px;padding:8px 10px;background:rgba(255,230,1,0.1);border-radius:8px;">🏅 Reconocida por: <strong>${site.reconocido_por}</strong></div>`
+        : '';
       return `
         <div class="popup-content">
-          <div class="popup-header" style="background:${estado.color}"></div>
+          ${imgHeader}
           <div class="popup-body">
             <div class="popup-title-row">
               <span class="popup-icon">${tipo.icon}</span>
@@ -333,6 +368,7 @@
               <span class="popup-badge" style="background:var(--surface-2);color:var(--text)">${tipo.label}</span>
               ${site.elemento ? `<span class="popup-badge" style="background:var(--surface);color:var(--muted)">${site.elemento}</span>` : ''}
             </div>
+            ${reconocidaPor}
             <div class="popup-coords">📍 ${parseFloat(site.lat).toFixed(4)}, ${parseFloat(site.lng).toFixed(4)}</div>
             ${enlaceBtn}
           </div>
@@ -342,11 +378,7 @@
 
     // ========== DATOS ==========
     async function loadData() {
-      const btn = document.getElementById('reloadBtn');
       const loading = document.getElementById('loading');
-      
-      btn.textContent = '⏳ Cargando...';
-      btn.disabled = true;
       loading.style.display = 'flex';
       
       try {
@@ -362,7 +394,9 @@
           tipo_elemento: row.tipo_elemento || 'arquitectonico',
           elemento: row.elemento || '',
           ubicacion: row.ubicacion || '',
-          enlace_mmorp: row.enlace_mmorp || ''
+          enlace_mmorp: row.enlace_mmorp || '',
+          imagen: row.imagen || '',
+          reconocido_por: row.reconocido_por || ''
         })).filter(s => !isNaN(s.lat) && !isNaN(s.lng));
         
         updateCounts();
@@ -377,8 +411,6 @@
         alert('Error al cargar datos. Intenta de nuevo.');
       }
       
-      btn.textContent = '🔄 Actualizar';
-      btn.disabled = false;
       loading.style.display = 'none';
     }
 
@@ -388,7 +420,7 @@
       
       const filtered = allSites.filter(s => filters[s.estado]);
       filtered.forEach(site => {
-        const marker = L.marker([site.lat, site.lng], { icon: createMarkerIcon(site.estado) }).addTo(map);
+        const marker = L.marker([site.lat, site.lng], { icon: createMarkerIcon(site.estado, site.imagen) }).addTo(map);
         marker.bindPopup(createPopupContent(site), { maxWidth: 300 });
         marker.siteId = site.id;
         markers.push(marker);
@@ -410,9 +442,12 @@
         const tipo = tipoElementoConfig[site.tipo_elemento] || { icon: '📍' };
         const card = document.createElement('div');
         card.className = 'site-card';
+        const thumbHtml = site.imagen 
+          ? `<img class="site-thumb" src="${site.imagen}" referrerpolicy="no-referrer" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" /><div class="site-icon" style="display:none;background:${estado.color}20">${tipo.icon}</div>`
+          : `<div class="site-icon" style="background:${estado.color}20">${tipo.icon}</div>`;
         card.innerHTML = `
           <div class="site-card-inner">
-            <div class="site-icon" style="background:${estado.color}20">${tipo.icon}</div>
+            ${thumbHtml}
             <div class="site-info">
               <div class="site-name">${site.nombre}</div>
               <div class="site-location">${site.ubicacion || ''}${site.elemento ? ' · ' + site.elemento : ''}</div>
@@ -451,8 +486,6 @@
       this.textContent = sidebar.classList.contains('closed') ? '▶' : '◀';
     });
 
-    document.getElementById('themeToggle').addEventListener('click', toggleTheme);
-
     ['disponible', 'reconocida', 'perdida', 'proximamente'].forEach(estado => {
       document.getElementById(`filter-${estado}`).addEventListener('change', function() {
         filters[estado] = this.checked;
@@ -462,6 +495,10 @@
 
     document.getElementById('modalAbout').addEventListener('click', function(e) {
       if (e.target === this) closeModal('about');
+    });
+
+    document.getElementById('modalReconocimiento').addEventListener('click', function(e) {
+      if (e.target === this) closeReconocimientoModal();
     });
 
     // ========== INICIAR ==========
@@ -640,6 +677,47 @@
     function closeReconocerModal() {
       document.getElementById('modalReconocer').style.display = 'none';
       window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    // ========== MODAL RECONOCIMIENTO (LISTADO) ==========
+    async function openReconocimientoModal() {
+      const modal = document.getElementById('modalReconocimiento');
+      const body = document.getElementById('reconocimientoBody');
+      modal.style.display = 'flex';
+      body.innerHTML = '<div style="text-align:center;padding:20px;"><div class="loading-spinner"></div><p style="color:var(--muted);">Cargando...</p></div>';
+
+      try {
+        const response = await fetch(APPS_SCRIPT_URL + '?action=reconocimiento');
+        const data = await response.json();
+
+        if (!data || data.length === 0) {
+          body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);"><div style="font-size:48px;margin-bottom:12px;">🏅</div><p>Aún no hay reconocimientos</p></div>';
+          return;
+        }
+
+        let html = '';
+        data.forEach(item => {
+          const imgSrc = item.imagen || '';
+          html += `
+            <div class="rec-list-item">
+              <img class="rec-list-thumb" src="${imgSrc}" referrerpolicy="no-referrer" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 48 48%22><rect fill=%22%23246B73%22 width=%2248%22 height=%2248%22 rx=%228%22/><text x=%2224%22 y=%2232%22 text-anchor=%22middle%22 font-size=%2220%22>🏅</text></svg>';" />
+              <div class="rec-list-info">
+                <div class="rec-list-alias">${item.alias || 'Anónimo'}</div>
+                <div class="rec-list-fecha">${item.fecha || ''}</div>
+              </div>
+            </div>
+          `;
+        });
+
+        body.innerHTML = html;
+      } catch (e) {
+        console.error('Error cargando reconocimientos:', e);
+        body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);"><div style="font-size:48px;margin-bottom:12px;">❌</div><p>Error al cargar reconocimientos</p></div>';
+      }
+    }
+
+    function closeReconocimientoModal() {
+      document.getElementById('modalReconocimiento').style.display = 'none';
     }
   </script>
 </body>
